@@ -13,6 +13,7 @@ class HUDWindow: NSWindow {
         )
         
         self.isReleasedWhenClosed = false
+        self.appearance = NSAppearance(named: .aqua) // Force light appearance (no dark mode)
         self.level = .statusBar // Float above standard windows and menu bar
         self.backgroundColor = .clear
         self.isMovableByWindowBackground = true

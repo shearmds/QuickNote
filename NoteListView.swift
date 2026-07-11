@@ -1,35 +1,44 @@
 import SwiftUI
 import SwiftData
 import UniformTypeIdentifiers
+#if os(macOS)
+import AppKit
+#else
+import UIKit
+#endif
 
 struct NoteListView: View {
     @Environment(\.modelContext) private var modelContext
-    @Query(sort: \Note.createdAt, order: .reverse) private var allNotes: [Note]
-    
+
     @State private var searchText = ""
     @State private var newNoteContent = ""
     @State private var showArchived = false
     @State private var isExportingBackup = false
     @State private var backupFolderDocument: NoteFolderDocument?
+    @State private var saveErrorMessage: String?
+    @AppStorage("noteTextSizeV2") private var textSizeRaw: Int = NoteTextSize.standard.rawValue
     @FocusState private var isInputFocused: Bool
-    
-    // Filtered notes based on search text (searches both active & archived) or folder toggle
-    var filteredNotes: [Note] {
-        if searchText.isEmpty {
-            return allNotes.filter { $0.isArchived == showArchived }
-        } else {
-            return allNotes.filter { $0.content.localizedCaseInsensitiveContains(searchText) }
-        }
+
+    private var textSize: NoteTextSize { NoteTextSize(rawValue: textSizeRaw) ?? .standard }
+
+    // A whisper of warmth behind the content: near-white fading to a faint indigo tint.
+    private var appBackgroundGradient: LinearGradient {
+        LinearGradient(
+            colors: [Color.white, Color.indigo.opacity(0.06)],
+            startPoint: .top,
+            endPoint: .bottom
+        )
     }
-    
+
     var body: some View {
         #if os(iOS)
         NavigationStack {
             VStack(spacing: 0) {
                 quickInputArea
                 Divider()
-                notesList
+                FilteredNotesList(searchText: searchText, showArchived: showArchived)
             }
+            .background(appBackgroundGradient.ignoresSafeArea())
             .navigationTitle("QuickNote")
             .navigationBarTitleDisplayMode(.inline)
             .searchable(text: $searchText, prompt: "Search notes...")
@@ -41,17 +50,25 @@ struct NoteListView: View {
                                 .foregroundColor(showArchived ? .green : .secondary)
                         }
                         .help(showArchived ? "Show Active Notes" : "Show Archived Notes")
-                        
-                        Button(action: {
-                            backupFolderDocument = NoteFolderDocument(notes: allNotes)
-                            isExportingBackup = true
-                        }) {
+
+                        Button(action: exportAllNotes) {
                             Image(systemName: "square.and.arrow.up")
                         }
                         .help("Export all notes...")
+
+                        Menu {
+                            Picker("Text Size", selection: $textSizeRaw) {
+                                ForEach(NoteTextSize.allCases) { size in
+                                    Text(size.label).tag(size.rawValue)
+                                }
+                            }
+                        } label: {
+                            Image(systemName: "textformat.size")
+                        }
                     }
                 }
             }
+            .saveErrorAlert(message: $saveErrorMessage)
             .fileExporter(
                 isPresented: $isExportingBackup,
                 document: backupFolderDocument,
@@ -66,18 +83,21 @@ struct NoteListView: View {
                 }
             }
         }
+        .environment(\.noteTextScale, textSize.scale)
+        .preferredColorScheme(.light)
         #else
         // macOS HUD Layout
         VStack(spacing: 0) {
             macOSHeader
             quickInputArea
             Divider()
-            notesList
+            FilteredNotesList(searchText: searchText, showArchived: showArchived)
         }
         .onAppear {
             isInputFocused = true
         }
         .frame(minWidth: 500, minHeight: 350)
+        .saveErrorAlert(message: $saveErrorMessage)
         .fileExporter(
             isPresented: $isExportingBackup,
             document: backupFolderDocument,
@@ -91,19 +111,34 @@ struct NoteListView: View {
                 print("Failed to export notes: \(error)")
             }
         }
+        .environment(\.noteTextScale, textSize.scale)
+        .preferredColorScheme(.light)
         #endif
     }
     
     private func saveNewNote() {
         let content = newNoteContent.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !content.isEmpty else { return }
-        
-        let newNote = Note(content: content)
-        modelContext.insert(newNote)
-        try? modelContext.save() // Explicitly save SwiftData context
-        newNoteContent = ""
-        
 
+        let newNote = Note(content: content)
+        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+            modelContext.insert(newNote)
+        }
+        do {
+            try modelContext.save()
+            newNoteContent = "" // Only clear the field once the note is safely saved.
+        } catch {
+            saveErrorMessage = "Your note couldn't be saved: \(error.localizedDescription)"
+        }
+    }
+
+    /// Fetches every note on demand for the "Export all" action, so the view
+    /// doesn't need to keep a second live query of the entire store in memory.
+    private func exportAllNotes() {
+        let descriptor = FetchDescriptor<Note>(sortBy: [SortDescriptor(\.createdAt, order: .reverse)])
+        let notes = (try? modelContext.fetch(descriptor)) ?? []
+        backupFolderDocument = NoteFolderDocument(notes: notes)
+        isExportingBackup = true
     }
     
     // Shared Input Area
@@ -113,14 +148,14 @@ struct NoteListView: View {
                 if newNoteContent.isEmpty {
                     #if os(macOS)
                     Text("Jot down something quick... (Cmd+Enter to save, Esc to close)")
-                        .font(.system(.body, design: .rounded))
+                        .scaledFont(.body)
                         .foregroundColor(.secondary.opacity(0.7))
                         .padding(.horizontal, 12)
                         .padding(.vertical, 10)
                         .allowsHitTesting(false)
                     #else
                     Text("Jot down something quick...")
-                        .font(.system(.body, design: .rounded))
+                        .scaledFont(.body)
                         .foregroundColor(.secondary.opacity(0.7))
                         .padding(.horizontal, 12)
                         .padding(.vertical, 10)
@@ -129,23 +164,31 @@ struct NoteListView: View {
                 }
                 
                 TextEditor(text: $newNoteContent)
-                    .font(.system(.body, design: .rounded))
+                    .scaledFont(.body)
                     .focused($isInputFocused)
                     .scrollContentBackground(.hidden)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 6)
+                    #if os(iOS)
+                    .frame(maxHeight: .infinity) // Grows to fill the input area's share of the screen
+                    #else
                     .frame(height: 90)
+                    #endif
             }
-            #if os(macOS)
             .background(Color.white)
-            #else
-            .background(Color.primary.opacity(0.03))
-            #endif
             .cornerRadius(10)
             .overlay(
                 RoundedRectangle(cornerRadius: 10)
-                    .stroke(Color.primary.opacity(0.1), lineWidth: 1)
+                    .strokeBorder(
+                        isInputFocused ? AnyShapeStyle(LinearGradient.brand) : AnyShapeStyle(Color.primary.opacity(0.1)),
+                        lineWidth: isInputFocused ? 1.5 : 1
+                    )
             )
+            .shadow(
+                color: isInputFocused ? Color.indigo.opacity(0.22) : Color.black.opacity(0.05),
+                radius: isInputFocused ? 7 : 3, x: 0, y: 2
+            )
+            .animation(.easeInOut(duration: 0.2), value: isInputFocused)
             
             HStack {
                 Spacer()
@@ -166,43 +209,24 @@ struct NoteListView: View {
                     .foregroundColor(.white)
                     .padding(.horizontal, 16)
                     .padding(.vertical, 6)
-                    .background(
-                        LinearGradient(colors: [.indigo, .purple], startPoint: .topLeading, endPoint: .bottomTrailing)
-                    )
+                    .background(LinearGradient.brand)
                     .cornerRadius(8)
+                    .shadow(color: Color.indigo.opacity(0.35), radius: 5, x: 0, y: 3)
+                    .opacity(newNoteContent.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? 0.5 : 1)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(PressableButtonStyle())
                 .disabled(newNoteContent.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                .animation(.easeInOut(duration: 0.2), value: newNoteContent.isEmpty)
                 .keyboardShortcut(.return, modifiers: .command)
             }
         }
         .padding(16)
+        #if os(iOS)
+        // Claim roughly half the height so the entry field is comfortably tall,
+        // sharing the screen with the notes list below.
+        .frame(maxHeight: .infinity)
+        #endif
         .background(Color.primary.opacity(0.01))
-    }
-    
-    // Shared Notes List
-    private var notesList: some View {
-        ScrollView {
-            LazyVStack(spacing: 12) {
-                if filteredNotes.isEmpty {
-                    VStack(spacing: 8) {
-                        Image(systemName: searchText.isEmpty ? (showArchived ? "archivebox" : "note.text") : "magnifyingglass")
-                            .font(.system(size: 32))
-                            .foregroundColor(.secondary.opacity(0.5))
-                        Text(searchText.isEmpty ? (showArchived ? "No archived notes yet." : "No active notes. Jot one down!") : "No notes matching your search.")
-                            .font(.system(.subheadline, design: .rounded))
-                            .foregroundColor(.secondary)
-                    }
-                    .padding(.top, 40)
-                } else {
-                    ForEach(filteredNotes) { note in
-                        NoteRowView(note: note)
-                            .transition(.opacity.combined(with: .scale(scale: 0.95)))
-                    }
-                }
-            }
-            .padding(16)
-        }
     }
     
     // macOS Header
@@ -230,10 +254,7 @@ struct NoteListView: View {
             .help(showArchived ? "Show Active Notes" : "Show Archived Notes")
             
             // Bulk Export Button
-            Button(action: {
-                backupFolderDocument = NoteFolderDocument(notes: allNotes)
-                isExportingBackup = true
-            }) {
+            Button(action: exportAllNotes) {
                 Image(systemName: "square.and.arrow.up")
                     .font(.system(.title3, design: .rounded))
                     .foregroundColor(.secondary)
@@ -241,7 +262,25 @@ struct NoteListView: View {
             }
             .buttonStyle(.plain)
             .help("Export all notes...")
-            
+
+            // Text Size Menu
+            Menu {
+                Picker("Text Size", selection: $textSizeRaw) {
+                    ForEach(NoteTextSize.allCases) { size in
+                        Text(size.label).tag(size.rawValue)
+                    }
+                }
+            } label: {
+                Image(systemName: "textformat.size")
+                    .font(.system(.title3, design: .rounded))
+                    .foregroundColor(.secondary)
+                    .padding(.trailing, 6)
+            }
+            .menuStyle(.borderlessButton)
+            .menuIndicator(.hidden)
+            .fixedSize()
+            .help("Adjust text size")
+
             // Search Bar
             HStack {
                 Image(systemName: "magnifyingglass")
@@ -270,9 +309,16 @@ struct NoteListView: View {
     #endif
 }
 
+extension UTType {
+    /// Markdown content type for single-note exports. Conforms to plain text so
+    /// it remains a valid text file, while carrying the `.md` extension the
+    /// exported content actually uses.
+    static let quickNoteMarkdown = UTType(filenameExtension: "md", conformingTo: .plainText) ?? .plainText
+}
+
 // Helper Document struct for native File Exporter support (Single file)
 struct NoteDocument: FileDocument {
-    static var readableContentTypes: [UTType] { [.plainText] }
+    static var readableContentTypes: [UTType] { [.quickNoteMarkdown] }
     
     var text: String
     
@@ -295,38 +341,47 @@ struct NoteDocument: FileDocument {
     }
 }
 
+// A plain, Sendable snapshot of the fields we export, so the document can be
+// serialized off the main actor without touching MainActor-isolated `Note`.
+struct NoteExportItem: Sendable {
+    let content: String
+    let createdAt: Date
+}
+
 // Helper Document struct for exporting all notes into a single directory folder
 struct NoteFolderDocument: FileDocument {
     static var readableContentTypes: [UTType] { [.folder] }
-    
-    var notes: [Note]
-    
+
+    var items: [NoteExportItem]
+
     init(notes: [Note]) {
-        self.notes = notes
+        // Snapshot model values here (on the caller's main actor) so the
+        // `fileWrapper(configuration:)` serialization can safely run off-main.
+        self.items = notes.map { NoteExportItem(content: $0.content, createdAt: $0.createdAt) }
     }
-    
+
     init(configuration: ReadConfiguration) throws {
-        self.notes = []
+        self.items = []
     }
-    
+
     func fileWrapper(configuration: WriteConfiguration) throws -> FileWrapper {
         var fileWrappers: [String: FileWrapper] = [:]
-        
+
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd_HHmmss"
-        
-        for (index, note) in notes.enumerated() {
+
+        for (index, note) in items.enumerated() {
             let noteContent = """
             # Note - \(note.createdAt.formatted())
-            
+
             \(note.content)
             """
-            
+
             let data = noteContent.data(using: .utf8) ?? Data()
             let noteFileWrapper = FileWrapper(regularFileWithContents: data)
-            
+
             let dateString = formatter.string(from: note.createdAt)
-            
+
             // Clean up content to create a short preview name (first 25 characters)
             let cleanPreview = note.content
                 .trimmingCharacters(in: .whitespacesAndNewlines)
@@ -335,14 +390,212 @@ struct NoteFolderDocument: FileDocument {
                 .components(separatedBy: CharacterSet.alphanumerics.inverted)
                 .filter { !$0.isEmpty }
                 .joined(separator: "_")
-            
+
             let suffix = cleanPreview.isEmpty ? "" : "_\(cleanPreview)"
-            let filename = "Note_\(dateString)\(suffix).md"
-            
+            // Include the note's index so notes created within the same second
+            // (or with identical previews) never collide and overwrite each other.
+            let indexString = String(format: "%03d", index + 1)
+            let filename = "Note_\(dateString)_\(indexString)\(suffix).md"
+
             fileWrappers[filename] = noteFileWrapper
         }
         
         return FileWrapper(directoryWithFileWrappers: fileWrappers)
+    }
+}
+
+/// Displays the notes list using a SwiftData `@Query` whose predicate filters in
+/// the store itself, rather than fetching every note and filtering in memory.
+/// The query is rebuilt whenever the search text or archive toggle changes.
+private struct FilteredNotesList: View {
+    @Query private var notes: [Note]
+    private let searchText: String
+    private let showArchived: Bool
+
+    init(searchText: String, showArchived: Bool) {
+        self.searchText = searchText
+        self.showArchived = showArchived
+        // With no search text, show just the selected tab (active vs. archived).
+        // While searching, match content across BOTH active and archived notes.
+        let predicate = #Predicate<Note> { note in
+            (searchText.isEmpty && note.isArchived == showArchived) ||
+            (!searchText.isEmpty && note.content.localizedStandardContains(searchText))
+        }
+        // Sorted newest-first here; pinned notes are floated to the top in `body`.
+        _notes = Query(filter: predicate, sort: \Note.createdAt, order: .reverse)
+    }
+
+    // Pinned notes first, then the rest — each group already newest-first from the query.
+    private var orderedNotes: [Note] {
+        notes.filter(\.isPinned) + notes.filter { !$0.isPinned }
+    }
+
+    var body: some View {
+        ScrollView {
+            LazyVStack(spacing: 12) {
+                if notes.isEmpty {
+                    emptyState
+                } else {
+                    ForEach(orderedNotes) { note in
+                        NoteRowView(note: note)
+                            .transition(.opacity.combined(with: .scale(scale: 0.95)))
+                    }
+                }
+            }
+            .padding(16)
+        }
+    }
+
+    private var emptyState: some View {
+        VStack(spacing: 8) {
+            Image(systemName: searchText.isEmpty ? (showArchived ? "archivebox" : "note.text") : "magnifyingglass")
+                .font(.system(size: 34))
+                .foregroundStyle(
+                    LinearGradient(
+                        colors: [.indigo.opacity(0.55), .purple.opacity(0.55)],
+                        startPoint: .top, endPoint: .bottom
+                    )
+                )
+            Text(searchText.isEmpty ? (showArchived ? "No archived notes yet." : "No active notes. Jot one down!") : "No notes matching your search.")
+                .scaledFont(.subheadline)
+                .foregroundColor(.secondary)
+        }
+        .padding(.top, 40)
+    }
+}
+
+/// User-selectable text size, expressed as a scale multiplier applied on top of
+/// each text style's natural size. This works on both iOS and macOS (macOS does
+/// not scale text styles via Dynamic Type, so we scale explicitly). At `.standard`
+/// (1.0) on iOS this still tracks the system's own text-size setting, because the
+/// base sizes come from the platform's preferred fonts.
+enum NoteTextSize: Int, CaseIterable, Identifiable {
+    case small, standard, large, xLarge, xxLarge
+
+    var id: Int { rawValue }
+
+    var label: String {
+        switch self {
+        case .small:    return "Small"
+        case .standard: return "Default"
+        case .large:    return "Large"
+        case .xLarge:   return "Extra Large"
+        case .xxLarge:  return "Huge"
+        }
+    }
+
+    var scale: CGFloat {
+        switch self {
+        case .small:    return 0.85
+        case .standard: return 1.0
+        case .large:    return 1.2
+        case .xLarge:   return 1.4
+        case .xxLarge:  return 1.7
+        }
+    }
+}
+
+extension LinearGradient {
+    /// The app's signature indigo→purple accent gradient, reused across the UI.
+    static let brand = LinearGradient(
+        colors: [.indigo, .purple],
+        startPoint: .topLeading,
+        endPoint: .bottomTrailing
+    )
+}
+
+/// Gives buttons a subtle press-down response without changing their look.
+struct PressableButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.96 : 1.0)
+            .opacity(configuration.isPressed ? 0.9 : 1.0)
+            .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
+    }
+}
+
+private struct NoteTextScaleKey: EnvironmentKey {
+    static let defaultValue: CGFloat = 1.0
+}
+
+extension EnvironmentValues {
+    /// Multiplier applied to note text by `scaledFont(_:)`.
+    var noteTextScale: CGFloat {
+        get { self[NoteTextScaleKey.self] }
+        set { self[NoteTextScaleKey.self] = newValue }
+    }
+}
+
+extension Font.TextStyle {
+    /// The natural point size of this text style on the current platform,
+    /// which on iOS already reflects the user's system text-size setting.
+    var platformPointSize: CGFloat {
+        #if os(macOS)
+        let nsStyle: NSFont.TextStyle
+        switch self {
+        case .largeTitle:  nsStyle = .largeTitle
+        case .title:       nsStyle = .title1
+        case .title2:      nsStyle = .title2
+        case .title3:      nsStyle = .title3
+        case .headline:    nsStyle = .headline
+        case .subheadline: nsStyle = .subheadline
+        case .callout:     nsStyle = .callout
+        case .footnote:    nsStyle = .footnote
+        case .caption:     nsStyle = .caption1
+        case .caption2:    nsStyle = .caption2
+        default:           nsStyle = .body
+        }
+        return NSFont.preferredFont(forTextStyle: nsStyle).pointSize
+        #else
+        let uiStyle: UIFont.TextStyle
+        switch self {
+        case .largeTitle:  uiStyle = .largeTitle
+        case .title:       uiStyle = .title1
+        case .title2:      uiStyle = .title2
+        case .title3:      uiStyle = .title3
+        case .headline:    uiStyle = .headline
+        case .subheadline: uiStyle = .subheadline
+        case .callout:     uiStyle = .callout
+        case .footnote:    uiStyle = .footnote
+        case .caption:     uiStyle = .caption1
+        case .caption2:    uiStyle = .caption2
+        default:           uiStyle = .body
+        }
+        return UIFont.preferredFont(forTextStyle: uiStyle).pointSize
+        #endif
+    }
+}
+
+private struct ScaledRoundedFont: ViewModifier {
+    @Environment(\.noteTextScale) private var scale
+    let style: Font.TextStyle
+
+    func body(content: Content) -> some View {
+        content.font(.system(size: style.platformPointSize * scale, design: .rounded))
+    }
+}
+
+extension View {
+    /// A rounded font for `style`, scaled by the user's chosen text size.
+    /// Use in place of `.font(.system(style, design: .rounded))` on content text.
+    func scaledFont(_ style: Font.TextStyle) -> some View {
+        modifier(ScaledRoundedFont(style: style))
+    }
+
+    /// Presents an alert whenever `message` is non-nil, so silent persistence
+    /// failures surface to the user instead of quietly losing data.
+    func saveErrorAlert(message: Binding<String?>) -> some View {
+        alert(
+            "Couldn't Save",
+            isPresented: Binding(
+                get: { message.wrappedValue != nil },
+                set: { if !$0 { message.wrappedValue = nil } }
+            )
+        ) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(message.wrappedValue ?? "")
+        }
     }
 }
 

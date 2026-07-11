@@ -11,14 +11,19 @@ struct NoteRowView: View {
     @State private var editedContent = ""
     @State private var isExportingNote = false
     @State private var noteDocument: NoteDocument?
-    
-    // Parse Markdown to AttributedString safely
-    var parsedContent: AttributedString {
-        do {
-            return try AttributedString(markdown: note.content, options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace))
-        } catch {
-            return AttributedString(note.content)
-        }
+    @State private var showingDeleteConfirmation = false
+    @State private var saveErrorMessage: String?
+
+    // Cached rendered markdown, recomputed only when the note's content changes
+    // (see `.task(id:)` below) rather than on every view re-render.
+    @State private var renderedContent = AttributedString("")
+
+    // Parse Markdown to an AttributedString safely.
+    static func parseMarkdown(_ raw: String) -> AttributedString {
+        (try? AttributedString(
+            markdown: raw,
+            options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace)
+        )) ?? AttributedString(raw)
     }
     
     var body: some View {
@@ -26,8 +31,8 @@ struct NoteRowView: View {
             // Elegant Note Body Card
             VStack(alignment: .leading, spacing: 6) {
                 // Markdown Content
-                Text(parsedContent)
-                    .font(.system(.body, design: .rounded))
+                Text(renderedContent)
+                    .scaledFont(.body)
                     .lineLimit(3) // Truncate list preview at 3 lines
                     .lineSpacing(3)
                     .foregroundColor(.primary.opacity(0.85))
@@ -36,11 +41,16 @@ struct NoteRowView: View {
                 
                 // Timestamp & Status
                 HStack(spacing: 8) {
+                    if note.isPinned {
+                        Image(systemName: "pin.fill")
+                            .font(.system(size: 9))
+                            .foregroundColor(.indigo)
+                    }
                     Text(note.createdAt, style: .relative)
-                        .font(.system(.caption, design: .rounded))
+                        .scaledFont(.caption)
                         .foregroundColor(.secondary.opacity(0.7))
                     Text("ago")
-                        .font(.system(.caption, design: .rounded))
+                        .scaledFont(.caption)
                         .foregroundColor(.secondary.opacity(0.5))
                     
                     if note.isArchived {
@@ -57,14 +67,27 @@ struct NoteRowView: View {
                 }
             }
             .contentShape(Rectangle()) // Makes the whole card area tappable
+            .opacity(note.isArchived ? 0.8 : 1) // Archived notes read as slightly receded
             .onTapGesture {
                 editedContent = note.content
                 showingEditSheet = true
             }
-            
+
             // Hover/Quick Actions Column
             HStack(spacing: 8) {
                 if isHovering {
+                    // Pin Button
+                    Button(action: togglePin) {
+                        Image(systemName: note.isPinned ? "pin.slash" : "pin")
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundColor(note.isPinned ? .indigo : .secondary)
+                            .padding(6)
+                            .background(note.isPinned ? Color.indigo.opacity(0.12) : Color.primary.opacity(0.06))
+                            .clipShape(Circle())
+                    }
+                    .buttonStyle(.plain)
+                    .help(note.isPinned ? "Unpin note" : "Pin to top")
+
                     // Copy Button
                     Button(action: copyToClipboard) {
                         Image(systemName: "doc.on.doc")
@@ -105,7 +128,7 @@ struct NoteRowView: View {
                     .help(note.isArchived ? "Unarchive note" : "Archive note")
                     
                     // Delete Button
-                    Button(action: deleteNote) {
+                    Button(action: { showingDeleteConfirmation = true }) {
                         Image(systemName: "trash")
                             .font(.system(size: 11, weight: .medium))
                             .foregroundColor(.red.opacity(0.8))
@@ -117,19 +140,41 @@ struct NoteRowView: View {
                     .help("Delete note")
                 }
             }
+            #if os(macOS)
+            .frame(width: 152, alignment: .trailing) // Fits the five hover actions
+            #else
             .frame(width: 120, alignment: .trailing)
+            #endif
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 12)
         .background(
             RoundedRectangle(cornerRadius: 12)
-                .fill(Color.primary.opacity(0.02))
+                .fill(note.isArchived ? Color.primary.opacity(0.04) : Color.white)
         )
+        // Accent spine: brand gradient for active notes, muted for archived.
+        .overlay(alignment: .leading) {
+            RoundedRectangle(cornerRadius: 2)
+                .fill(note.isArchived ? AnyShapeStyle(Color.secondary.opacity(0.35)) : AnyShapeStyle(LinearGradient.brand))
+                .frame(width: 4)
+                .padding(.vertical, 12)
+                .padding(.leading, 5)
+        }
         .overlay(
             RoundedRectangle(cornerRadius: 12)
-                .stroke(Color.primary.opacity(0.04), lineWidth: 1)
+                .strokeBorder(
+                    isHovering ? Color.indigo.opacity(0.35) : Color.primary.opacity(0.06),
+                    lineWidth: 1
+                )
+        )
+        .shadow(
+            color: Color.black.opacity(isHovering ? 0.12 : 0.05),
+            radius: isHovering ? 9 : 4, x: 0, y: isHovering ? 4 : 2
         )
         .contextMenu {
+            Button(action: togglePin) {
+                Label(note.isPinned ? "Unpin" : "Pin to Top", systemImage: note.isPinned ? "pin.slash" : "pin")
+            }
             Button(action: copyToClipboard) {
                 Label("Copy", systemImage: "doc.on.doc")
             }
@@ -143,7 +188,7 @@ struct NoteRowView: View {
                 Label(note.isArchived ? "Unarchive" : "Archive", systemImage: note.isArchived ? "arrow.uturn.backward" : "archivebox")
             }
             Divider()
-            Button(role: .destructive, action: deleteNote) {
+            Button(role: .destructive, action: { showingDeleteConfirmation = true }) {
                 Label("Delete Note", systemImage: "trash")
             }
         }
@@ -153,8 +198,31 @@ struct NoteRowView: View {
                 isHovering = hovering
             }
         }
-        // Swipe to archive (iOS)
+        // Keep the rendered markdown in sync with the note's content.
+        .task(id: note.content) {
+            renderedContent = Self.parseMarkdown(note.content)
+        }
+        // Confirm before the (irreversible) delete from the quick actions/menu.
+        .confirmationDialog(
+            "Delete this note?",
+            isPresented: $showingDeleteConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("Delete", role: .destructive, action: deleteNote)
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This can't be undone.")
+        }
+        .saveErrorAlert(message: $saveErrorMessage)
+        // Swipe to pin (iOS)
         #if os(iOS)
+        .swipeActions(edge: .leading, allowsFullSwipe: true) {
+            Button(action: togglePin) {
+                Label(note.isPinned ? "Unpin" : "Pin", systemImage: note.isPinned ? "pin.slash" : "pin")
+            }
+            .tint(.indigo)
+        }
+        // Swipe to archive (iOS)
         .swipeActions(edge: .trailing, allowsFullSwipe: true) {
             Button(action: toggleArchive) {
                 Label(note.isArchived ? "Unarchive" : "Archive", systemImage: note.isArchived ? "arrow.uturn.backward" : "archivebox")
@@ -176,7 +244,7 @@ struct NoteRowView: View {
             NavigationStack {
                 VStack(spacing: 16) {
                     TextEditor(text: $editedContent)
-                        .font(.system(.body, design: .rounded))
+                        .scaledFont(.body)
                         .padding(8)
                         .background(Color.primary.opacity(0.03))
                         .cornerRadius(8)
@@ -220,19 +288,14 @@ struct NoteRowView: View {
                         }
                     }
                     ToolbarItem(placement: .navigationBarTrailing) {
-                        Button("Save") {
-                            note.content = editedContent.trimmingCharacters(in: .whitespacesAndNewlines)
-                            note.updatedAt = Date()
-                            try? modelContext.save()
-                            showingEditSheet = false
-                        }
+                        Button("Save", action: saveEdits)
                         .fontWeight(.bold)
                     }
                 }
                 .fileExporter(
                     isPresented: $isExportingNote,
                     document: noteDocument,
-                    contentType: .plainText,
+                    contentType: .quickNoteMarkdown,
                     defaultFilename: "NoteExport.md"
                 ) { result in
                     switch result {
@@ -247,11 +310,11 @@ struct NoteRowView: View {
             // macOS HUD Layout
             VStack(spacing: 16) {
                 Text("Edit Note")
-                    .font(.system(.headline, design: .rounded))
+                    .scaledFont(.headline)
                     .fontWeight(.bold)
                 
                 TextEditor(text: $editedContent)
-                    .font(.system(.body, design: .rounded))
+                    .scaledFont(.body)
                     .padding(8)
                     .background(Color.primary.opacity(0.03))
                     .cornerRadius(8)
@@ -287,12 +350,7 @@ struct NoteRowView: View {
                     
                     Spacer()
                     
-                    Button("Save") {
-                        note.content = editedContent.trimmingCharacters(in: .whitespacesAndNewlines)
-                        note.updatedAt = Date()
-                        try? modelContext.save()
-                        showingEditSheet = false
-                    }
+                    Button("Save", action: saveEdits)
                     .buttonStyle(.borderedProminent)
                     .tint(.indigo)
                     .keyboardShortcut(.return, modifiers: [.command])
@@ -303,7 +361,7 @@ struct NoteRowView: View {
             .fileExporter(
                 isPresented: $isExportingNote,
                 document: noteDocument,
-                contentType: .plainText,
+                contentType: .quickNoteMarkdown,
                 defaultFilename: "NoteExport.md"
             ) { result in
                 switch result {
@@ -317,18 +375,49 @@ struct NoteRowView: View {
         }
     }
     
+    private func saveEdits() {
+        note.content = editedContent.trimmingCharacters(in: .whitespacesAndNewlines)
+        note.updatedAt = Date()
+        do {
+            try modelContext.save()
+            showingEditSheet = false
+        } catch {
+            saveErrorMessage = "Your changes couldn't be saved: \(error.localizedDescription)"
+        }
+    }
+
+    private func togglePin() {
+        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+            note.isPinned.toggle()
+            note.updatedAt = Date()
+            do {
+                try modelContext.save()
+            } catch {
+                saveErrorMessage = "This change couldn't be saved: \(error.localizedDescription)"
+            }
+        }
+    }
+
     private func toggleArchive() {
         withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
             note.isArchived.toggle()
             note.updatedAt = Date()
-            try? modelContext.save()
+            do {
+                try modelContext.save()
+            } catch {
+                saveErrorMessage = "This change couldn't be saved: \(error.localizedDescription)"
+            }
         }
     }
-    
+
     private func deleteNote() {
         withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
             modelContext.delete(note)
-            try? modelContext.save()
+            do {
+                try modelContext.save()
+            } catch {
+                saveErrorMessage = "The note couldn't be deleted: \(error.localizedDescription)"
+            }
         }
     }
     
