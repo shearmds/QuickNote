@@ -19,7 +19,30 @@ struct NoteListView: View {
     @AppStorage("noteTextSizeV2") private var textSizeRaw: Int = NoteTextSize.standard.rawValue
     @FocusState private var isInputFocused: Bool
 
+    #if os(iOS)
+    @Environment(\.horizontalSizeClass) private var hSizeClass
+    @State private var selectedNote: Note?   // iPad master/detail selection
+    #endif
+
     private var textSize: NoteTextSize { NoteTextSize(rawValue: textSizeRaw) ?? .standard }
+
+    // The compose field fills half the screen on iPhone, but stays a fixed height
+    // in the narrower iPad sidebar (and the macOS HUD).
+    private var composeExpands: Bool {
+        #if os(iOS)
+        return hSizeClass != .regular
+        #else
+        return false
+        #endif
+    }
+
+    private var composeEditorHeightRange: (min: CGFloat, max: CGFloat) {
+        #if os(iOS)
+        return hSizeClass == .regular ? (140, 140) : (90, .infinity)
+        #else
+        return (90, 90)
+        #endif
+    }
 
     // A whisper of warmth behind the content: near-white fading to a faint indigo tint.
     private var appBackgroundGradient: LinearGradient {
@@ -31,43 +54,70 @@ struct NoteListView: View {
     }
 
     var body: some View {
+        content
+            .environment(\.noteTextScale, textSize.scale)
+            .preferredColorScheme(.light)
+    }
+
+    @ViewBuilder
+    private var content: some View {
         #if os(iOS)
+        if hSizeClass == .regular {
+            iPadBody       // wide iPad: list + editor
+        } else {
+            iPhoneBody     // iPhone, or iPad in a narrow split
+        }
+        #else
+        macOSBody
+        #endif
+    }
+
+    #if os(iOS)
+    // iPhone (and compact iPad): single column, tap a note to edit in a sheet.
+    private var iPhoneBody: some View {
         NavigationStack {
-            VStack(spacing: 0) {
-                quickInputArea
-                Divider()
-                FilteredNotesList(searchText: searchText, showArchived: showArchived)
+            listColumn {
+                VStack(spacing: 0) {
+                    quickInputArea
+                    Divider()
+                    FilteredNotesList(searchText: searchText, showArchived: showArchived)
+                }
             }
+        }
+    }
+
+    // iPad: two-pane master/detail — the note list on the left, editor on the right.
+    private var iPadBody: some View {
+        NavigationSplitView {
+            listColumn {
+                VStack(spacing: 0) {
+                    quickInputArea
+                    Divider()
+                    FilteredNotesList(searchText: searchText, showArchived: showArchived, selection: $selectedNote)
+                }
+            }
+        } detail: {
+            NavigationStack {
+                if let selectedNote {
+                    NoteEditorPane(note: selectedNote) { self.selectedNote = nil }
+                        .id(selectedNote.id)
+                } else {
+                    editorPlaceholder
+                }
+            }
+        }
+        .navigationSplitViewStyle(.balanced)
+    }
+
+    // Shared decoration for the list column (title, search, toolbar, exporters).
+    @ViewBuilder
+    private func listColumn<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
+        content()
             .background(appBackgroundGradient.ignoresSafeArea())
             .navigationTitle("QuickNote")
             .navigationBarTitleDisplayMode(.inline)
             .searchable(text: $searchText, prompt: "Search notes...")
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    HStack(spacing: 12) {
-                        Button(action: { showArchived.toggle() }) {
-                            Image(systemName: showArchived ? "archivebox.fill" : "archivebox")
-                                .foregroundColor(showArchived ? .green : .secondary)
-                        }
-                        .help(showArchived ? "Show Active Notes" : "Show Archived Notes")
-
-                        Button(action: exportAllNotes) {
-                            Image(systemName: "square.and.arrow.up")
-                        }
-                        .help("Export all notes...")
-
-                        Menu {
-                            Picker("Text Size", selection: $textSizeRaw) {
-                                ForEach(NoteTextSize.allCases) { size in
-                                    Text(size.label).tag(size.rawValue)
-                                }
-                            }
-                        } label: {
-                            Image(systemName: "textformat.size")
-                        }
-                    }
-                }
-            }
+            .toolbar { listToolbarContent }
             .saveErrorAlert(message: $saveErrorMessage)
             .fileExporter(
                 isPresented: $isExportingBackup,
@@ -76,17 +126,62 @@ struct NoteListView: View {
                 defaultFilename: "QuickNotesBackup"
             ) { result in
                 switch result {
-                case .success(let url):
-                    print("Exported notes successfully to \(url)")
-                case .failure(let error):
-                    print("Failed to export notes: \(error)")
+                case .success(let url): print("Exported notes successfully to \(url)")
+                case .failure(let error): print("Failed to export notes: \(error)")
+                }
+            }
+    }
+
+    @ToolbarContentBuilder
+    private var listToolbarContent: some ToolbarContent {
+        ToolbarItem(placement: .navigationBarTrailing) {
+            HStack(spacing: 12) {
+                Button(action: { showArchived.toggle() }) {
+                    Image(systemName: showArchived ? "archivebox.fill" : "archivebox")
+                        .foregroundColor(showArchived ? .green : .secondary)
+                }
+                .help(showArchived ? "Show Active Notes" : "Show Archived Notes")
+
+                Button(action: exportAllNotes) {
+                    Image(systemName: "square.and.arrow.up")
+                }
+                .help("Export all notes...")
+
+                Menu {
+                    Picker("Text Size", selection: $textSizeRaw) {
+                        ForEach(NoteTextSize.allCases) { size in
+                            Text(size.label).tag(size.rawValue)
+                        }
+                    }
+                } label: {
+                    Image(systemName: "textformat.size")
                 }
             }
         }
-        .environment(\.noteTextScale, textSize.scale)
-        .preferredColorScheme(.light)
-        #else
-        // macOS HUD Layout
+    }
+
+    private var editorPlaceholder: some View {
+        VStack(spacing: 12) {
+            Image(systemName: "note.text")
+                .font(.system(size: 44))
+                .foregroundStyle(
+                    LinearGradient(colors: [.indigo.opacity(0.5), .purple.opacity(0.5)], startPoint: .top, endPoint: .bottom)
+                )
+            Text("Select a note to edit")
+                .scaledFont(.headline)
+                .foregroundColor(.secondary)
+            Text("or jot a new one on the left")
+                .scaledFont(.subheadline)
+                .foregroundColor(.secondary.opacity(0.7))
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(appBackgroundGradient.ignoresSafeArea())
+    }
+    #endif
+
+    #if os(macOS)
+    // macOS HUD Layout
+    private var macOSBody: some View {
         VStack(spacing: 0) {
             macOSHeader
             quickInputArea
@@ -105,16 +200,12 @@ struct NoteListView: View {
             defaultFilename: "QuickNotesBackup"
         ) { result in
             switch result {
-            case .success(let url):
-                print("Exported notes successfully to \(url)")
-            case .failure(let error):
-                print("Failed to export notes: \(error)")
+            case .success(let url): print("Exported notes successfully to \(url)")
+            case .failure(let error): print("Failed to export notes: \(error)")
             }
         }
-        .environment(\.noteTextScale, textSize.scale)
-        .preferredColorScheme(.light)
-        #endif
     }
+    #endif
     
     private func saveNewNote() {
         let content = newNoteContent.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -169,11 +260,7 @@ struct NoteListView: View {
                     .scrollContentBackground(.hidden)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 6)
-                    #if os(iOS)
-                    .frame(maxHeight: .infinity) // Grows to fill the input area's share of the screen
-                    #else
-                    .frame(height: 90)
-                    #endif
+                    .frame(minHeight: composeEditorHeightRange.min, maxHeight: composeEditorHeightRange.max)
             }
             .background(Color.white)
             .cornerRadius(10)
@@ -221,11 +308,9 @@ struct NoteListView: View {
             }
         }
         .padding(16)
-        #if os(iOS)
-        // Claim roughly half the height so the entry field is comfortably tall,
-        // sharing the screen with the notes list below.
-        .frame(maxHeight: .infinity)
-        #endif
+        // On iPhone, claim roughly half the height for a comfortably tall entry
+        // field; on iPad/macOS it stays a fixed height (see composeEditorHeightRange).
+        .frame(maxHeight: composeExpands ? .infinity : nil)
         .background(Color.primary.opacity(0.01))
     }
     
@@ -411,10 +496,12 @@ private struct FilteredNotesList: View {
     @Query private var notes: [Note]
     private let searchText: String
     private let showArchived: Bool
+    private let selection: Binding<Note?>?   // non-nil on iPad master/detail
 
-    init(searchText: String, showArchived: Bool) {
+    init(searchText: String, showArchived: Bool, selection: Binding<Note?>? = nil) {
         self.searchText = searchText
         self.showArchived = showArchived
+        self.selection = selection
         // With no search text, show just the selected tab (active vs. archived).
         // While searching, match content across BOTH active and archived notes.
         let predicate = #Predicate<Note> { note in
@@ -437,7 +524,7 @@ private struct FilteredNotesList: View {
                     emptyState
                 } else {
                     ForEach(orderedNotes) { note in
-                        NoteRowView(note: note)
+                        NoteRowView(note: note, selection: selection)
                             .transition(.opacity.combined(with: .scale(scale: 0.95)))
                     }
                 }
@@ -494,6 +581,111 @@ enum NoteTextSize: Int, CaseIterable, Identifiable {
         }
     }
 }
+
+#if os(iOS)
+/// The editor pane shown on the right side of the iPad master/detail layout.
+/// Edits the note in place (SwiftData autosaves; we also save on disappear).
+private struct NoteEditorPane: View {
+    @Environment(\.modelContext) private var modelContext
+    @Bindable var note: Note
+    var onDelete: () -> Void
+
+    @State private var isExportingNote = false
+    @State private var noteDocument: NoteDocument?
+    @State private var showingDeleteConfirmation = false
+    @State private var saveErrorMessage: String?
+
+    var body: some View {
+        TextEditor(text: $note.content)
+            .scaledFont(.body)
+            .scrollContentBackground(.hidden)
+            .padding(20)
+            .background(Color.white.ignoresSafeArea())
+            .navigationTitle("Note")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItemGroup(placement: .navigationBarTrailing) {
+                    Button(action: togglePin) {
+                        Image(systemName: note.isPinned ? "pin.slash" : "pin")
+                            .foregroundColor(note.isPinned ? .indigo : .secondary)
+                    }
+                    .help(note.isPinned ? "Unpin note" : "Pin to top")
+
+                    Button(action: toggleArchive) {
+                        Image(systemName: note.isArchived ? "arrow.uturn.backward" : "archivebox")
+                    }
+                    .help(note.isArchived ? "Unarchive note" : "Archive note")
+
+                    Button {
+                        noteDocument = NoteDocument(text: generateExport())
+                        isExportingNote = true
+                    } label: {
+                        Image(systemName: "square.and.arrow.up")
+                    }
+                    .help("Export note...")
+
+                    Button(role: .destructive) {
+                        showingDeleteConfirmation = true
+                    } label: {
+                        Image(systemName: "trash")
+                    }
+                    .help("Delete note")
+                }
+            }
+            .onChange(of: note.content) { _, _ in note.updatedAt = Date() }
+            .onDisappear { try? modelContext.save() }
+            .confirmationDialog(
+                "Delete this note?",
+                isPresented: $showingDeleteConfirmation,
+                titleVisibility: .visible
+            ) {
+                Button("Delete", role: .destructive) {
+                    modelContext.delete(note)
+                    try? modelContext.save()
+                    onDelete()
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("This can't be undone.")
+            }
+            .saveErrorAlert(message: $saveErrorMessage)
+            .fileExporter(
+                isPresented: $isExportingNote,
+                document: noteDocument,
+                contentType: .quickNoteMarkdown,
+                defaultFilename: "NoteExport.md"
+            ) { _ in }
+    }
+
+    private func togglePin() {
+        note.isPinned.toggle()
+        note.updatedAt = Date()
+        save()
+    }
+
+    private func toggleArchive() {
+        note.isArchived.toggle()
+        note.updatedAt = Date()
+        save()
+    }
+
+    private func save() {
+        do {
+            try modelContext.save()
+        } catch {
+            saveErrorMessage = "This change couldn't be saved: \(error.localizedDescription)"
+        }
+    }
+
+    private func generateExport() -> String {
+        """
+        # Note - \(note.createdAt.formatted())
+
+        \(note.content)
+        """
+    }
+}
+#endif
 
 extension LinearGradient {
     /// The app's signature indigo→purple accent gradient, reused across the UI.

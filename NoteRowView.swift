@@ -5,7 +5,10 @@ import UniformTypeIdentifiers
 struct NoteRowView: View {
     @Environment(\.modelContext) private var modelContext
     @Bindable var note: Note
-    
+    /// On iPad master/detail this drives the selection; when nil (iPhone/macOS),
+    /// tapping opens the edit sheet instead.
+    var selection: Binding<Note?>? = nil
+
     @State private var isHovering = false
     @State private var showingEditSheet = false
     @State private var editedContent = ""
@@ -14,31 +17,40 @@ struct NoteRowView: View {
     @State private var showingDeleteConfirmation = false
     @State private var saveErrorMessage: String?
 
-    // Cached rendered markdown, recomputed only when the note's content changes
-    // (see `.task(id:)` below) rather than on every view re-render.
-    @State private var renderedContent = AttributedString("")
+    private var isSelected: Bool { selection?.wrappedValue?.id == note.id }
 
-    // Parse Markdown to an AttributedString safely.
-    static func parseMarkdown(_ raw: String) -> AttributedString {
-        (try? AttributedString(
-            markdown: raw,
-            options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace)
-        )) ?? AttributedString(raw)
+    // The note's title: its first non-empty line.
+    private var titleLine: String {
+        for raw in note.content.split(whereSeparator: \.isNewline) {
+            let trimmed = raw.trimmingCharacters(in: .whitespaces)
+            if !trimmed.isEmpty { return trimmed }
+        }
+        return "Untitled Note"
     }
-    
+
+    // On iPad, tapping selects the note for the detail editor; elsewhere it
+    // opens the edit sheet.
+    private func beginEdit() {
+        if let selection {
+            selection.wrappedValue = note
+        } else {
+            editedContent = note.content
+            showingEditSheet = true
+        }
+    }
+
     var body: some View {
-        HStack(alignment: .top, spacing: 12) {
-            // Elegant Note Body Card
-            VStack(alignment: .leading, spacing: 6) {
-                // Markdown Content
-                Text(renderedContent)
+        HStack(alignment: .center, spacing: 12) {
+            // Title (first line of the note) with the time beneath it.
+            VStack(alignment: .leading, spacing: 4) {
+                Text(titleLine)
                     .scaledFont(.body)
-                    .lineLimit(3) // Truncate list preview at 3 lines
-                    .lineSpacing(3)
-                    .foregroundColor(.primary.opacity(0.85))
-                    .multilineTextAlignment(.leading)
+                    .fontWeight(.medium)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                    .foregroundColor(.primary.opacity(0.9))
                     .frame(maxWidth: .infinity, alignment: .leading)
-                
+
                 // Timestamp & Status
                 HStack(spacing: 8) {
                     if note.isPinned {
@@ -52,7 +64,7 @@ struct NoteRowView: View {
                     Text("ago")
                         .scaledFont(.caption)
                         .foregroundColor(.secondary.opacity(0.5))
-                    
+
                     if note.isArchived {
                         Text("Archived")
                             .font(.system(size: 9, weight: .bold, design: .rounded))
@@ -62,18 +74,14 @@ struct NoteRowView: View {
                             .background(Color.indigo.opacity(0.08))
                             .cornerRadius(4)
                     }
-                    
+
                     Spacer()
                 }
             }
-            .contentShape(Rectangle()) // Makes the whole card area tappable
             .opacity(note.isArchived ? 0.8 : 1) // Archived notes read as slightly receded
-            .onTapGesture {
-                editedContent = note.content
-                showingEditSheet = true
-            }
 
-            // Hover/Quick Actions Column
+            // Hover/Quick Actions Column (macOS only; iOS uses tap + context menu)
+            #if os(macOS)
             HStack(spacing: 8) {
                 if isHovering {
                     // Pin Button
@@ -101,10 +109,7 @@ struct NoteRowView: View {
                     .help("Copy to clipboard")
                     
                     // Edit Button
-                    Button(action: {
-                        editedContent = note.content
-                        showingEditSheet = true
-                    }) {
+                    Button(action: beginEdit) {
                         Image(systemName: "pencil")
                             .font(.system(size: 11, weight: .medium))
                             .foregroundColor(.secondary)
@@ -140,10 +145,7 @@ struct NoteRowView: View {
                     .help("Delete note")
                 }
             }
-            #if os(macOS)
             .frame(width: 152, alignment: .trailing) // Fits the five hover actions
-            #else
-            .frame(width: 120, alignment: .trailing)
             #endif
         }
         .padding(.horizontal, 14)
@@ -163,14 +165,17 @@ struct NoteRowView: View {
         .overlay(
             RoundedRectangle(cornerRadius: 12)
                 .strokeBorder(
-                    isHovering ? Color.indigo.opacity(0.35) : Color.primary.opacity(0.06),
-                    lineWidth: 1
+                    isSelected ? Color.indigo.opacity(0.9)
+                        : (isHovering ? Color.indigo.opacity(0.35) : Color.primary.opacity(0.06)),
+                    lineWidth: isSelected ? 2 : 1
                 )
         )
         .shadow(
             color: Color.black.opacity(isHovering ? 0.12 : 0.05),
             radius: isHovering ? 9 : 4, x: 0, y: isHovering ? 4 : 2
         )
+        .contentShape(Rectangle()) // Whole card (including padding) is tappable
+        .onTapGesture(perform: beginEdit)
         .contextMenu {
             Button(action: togglePin) {
                 Label(note.isPinned ? "Unpin" : "Pin to Top", systemImage: note.isPinned ? "pin.slash" : "pin")
@@ -178,10 +183,7 @@ struct NoteRowView: View {
             Button(action: copyToClipboard) {
                 Label("Copy", systemImage: "doc.on.doc")
             }
-            Button(action: {
-                editedContent = note.content
-                showingEditSheet = true
-            }) {
+            Button(action: beginEdit) {
                 Label("Edit", systemImage: "pencil")
             }
             Button(action: toggleArchive) {
@@ -197,10 +199,6 @@ struct NoteRowView: View {
             withAnimation(.easeInOut(duration: 0.15)) {
                 isHovering = hovering
             }
-        }
-        // Keep the rendered markdown in sync with the note's content.
-        .task(id: note.content) {
-            renderedContent = Self.parseMarkdown(note.content)
         }
         // Confirm before the (irreversible) delete from the quick actions/menu.
         .confirmationDialog(
@@ -229,10 +227,7 @@ struct NoteRowView: View {
             }
             .tint(note.isArchived ? .indigo : .green)
             
-            Button(action: {
-                editedContent = note.content
-                showingEditSheet = true
-            }) {
+            Button(action: beginEdit) {
                 Label("Edit", systemImage: "pencil")
             }
             .tint(.indigo)
@@ -412,6 +407,10 @@ struct NoteRowView: View {
 
     private func deleteNote() {
         withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+            // Clear the iPad detail selection if we're deleting the open note.
+            if selection?.wrappedValue?.id == note.id {
+                selection?.wrappedValue = nil
+            }
             modelContext.delete(note)
             do {
                 try modelContext.save()
