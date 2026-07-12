@@ -24,6 +24,8 @@ struct NoteListView: View {
     #if os(iOS)
     @Environment(\.horizontalSizeClass) private var hSizeClass
     @State private var selectedNote: Note?   // iPad master/detail selection
+    @State private var isSearchVisible = false        // iPhone: reveal search on tap
+    @FocusState private var isSearchFocused: Bool
     #endif
 
     private var textSize: NoteTextSize { NoteTextSize(rawValue: textSizeRaw) ?? .standard }
@@ -125,12 +127,51 @@ struct NoteListView: View {
         NavigationStack {
             listColumn {
                 VStack(spacing: 0) {
+                    if isSearchVisible {
+                        iPhoneSearchBar
+                            .transition(.move(edge: .top).combined(with: .opacity))
+                    }
                     quickInputArea
                     Divider()
                     FilteredNotesList(searchText: searchText, showArchived: showArchived)
+                        .scrollDismissesKeyboard(.immediately)
                 }
             }
         }
+        // The compose field should never grab focus (and pop the keyboard) on
+        // launch — that's macOS HUD behavior, not iPhone.
+        .onAppear { isInputFocused = false }
+    }
+
+    // A search field that slides in from the top when the toolbar's magnifying
+    // glass is tapped. Kept above the compose field so the keyboard never hides
+    // it. Styled to match the macOS search bar.
+    private var iPhoneSearchBar: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "magnifyingglass")
+                .foregroundColor(.secondary)
+            TextField("Search notes...", text: $searchText)
+                .textFieldStyle(.plain)
+                .focused($isSearchFocused)
+                .submitLabel(.search)
+                .autocorrectionDisabled()
+            Button {
+                searchText = ""
+                isSearchFocused = false
+                withAnimation(.easeInOut(duration: 0.2)) { isSearchVisible = false }
+            } label: {
+                Image(systemName: "xmark.circle.fill")
+                    .foregroundColor(.secondary)
+            }
+            .buttonStyle(.plain)
+        }
+        .scaledFont(.body)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 9)
+        .background(Color.primary.opacity(0.06))
+        .cornerRadius(10)
+        .padding(.horizontal, 16)
+        .padding(.top, 12)
     }
 
     // iPad: two-pane master/detail — the note list on the left, editor on the right.
@@ -143,6 +184,8 @@ struct NoteListView: View {
                     FilteredNotesList(searchText: searchText, showArchived: showArchived, selection: $selectedNote)
                 }
             }
+            // iPad keeps the standard always-visible search field in the sidebar.
+            .searchable(text: $searchText, prompt: "Search notes...")
         } detail: {
             NavigationStack {
                 if let selectedNote {
@@ -163,7 +206,6 @@ struct NoteListView: View {
             .background(appBackgroundGradient.ignoresSafeArea())
             .navigationTitle("QuickNote")
             .navigationBarTitleDisplayMode(.inline)
-            .searchable(text: $searchText, prompt: "Search notes...")
             .toolbar { listToolbarContent }
             .saveErrorAlert(message: $saveErrorMessage)
             .fileExporter(
@@ -181,16 +223,33 @@ struct NoteListView: View {
 
     @ToolbarContentBuilder
     private var listToolbarContent: some ToolbarContent {
+        // iPhone reveals search on demand; iPad has the always-visible field.
+        if hSizeClass != .regular {
+            ToolbarItem(placement: .navigationBarLeading) {
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) { isSearchVisible = true }
+                    isSearchFocused = true
+                } label: {
+                    Image(systemName: "magnifyingglass")
+                        .foregroundStyle(Color.primary)
+                }
+                .help("Search notes")
+            }
+        }
         ToolbarItem(placement: .navigationBarTrailing) {
-            HStack(spacing: 12) {
+            // Baseline alignment keeps the icons' bottoms on a shared line, so
+            // the taller square.and.arrow.up glyph no longer sits low. All three
+            // share one color (green only when the archive filter is active).
+            HStack(alignment: .firstTextBaseline, spacing: 18) {
                 Button(action: { showArchived.toggle() }) {
                     Image(systemName: showArchived ? "archivebox.fill" : "archivebox")
-                        .foregroundColor(showArchived ? .green : .secondary)
+                        .foregroundStyle(showArchived ? Color.green : Color.primary)
                 }
                 .help(showArchived ? "Show Active Notes" : "Show Archived Notes")
 
                 Button(action: exportAllNotes) {
                     Image(systemName: "square.and.arrow.up")
+                        .foregroundStyle(Color.primary)
                 }
                 .help("Export all notes...")
 
@@ -202,8 +261,11 @@ struct NoteListView: View {
                     }
                 } label: {
                     Image(systemName: "textformat.size")
+                        .foregroundStyle(Color.primary)
                 }
             }
+            .font(.body)
+            .imageScale(.large)
         }
     }
 
@@ -308,6 +370,15 @@ struct NoteListView: View {
                     .padding(.horizontal, 8)
                     .padding(.vertical, 6)
                     .frame(minHeight: composeEditorHeightRange.min, maxHeight: composeEditorHeightRange.max)
+                    #if os(iOS)
+                    // Give the on-screen keyboard an explicit way to close.
+                    .toolbar {
+                        ToolbarItemGroup(placement: .keyboard) {
+                            Spacer()
+                            Button("Done") { isInputFocused = false }
+                        }
+                    }
+                    #endif
             }
             .background(Color.white)
             .cornerRadius(10)
