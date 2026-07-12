@@ -18,6 +18,7 @@ struct NoteListView: View {
     @State private var saveErrorMessage: String?
     @AppStorage("noteTextSizeV2") private var textSizeRaw: Int = NoteTextSize.standard.rawValue
     @FocusState private var isInputFocused: Bool
+    @ObservedObject private var deepLinkRouter = DeepLinkRouter.shared
 
     #if os(iOS)
     @Environment(\.horizontalSizeClass) private var hSizeClass
@@ -57,6 +58,31 @@ struct NoteListView: View {
         content
             .environment(\.noteTextScale, textSize.scale)
             .preferredColorScheme(.light)
+            // Keeps the widget's App Group snapshot in sync with pinned notes.
+            .background(PinnedSnapshotSync())
+            .onAppear {
+                if let id = deepLinkRouter.pendingNoteID { handleDeepLink(id) }
+            }
+            .onChange(of: deepLinkRouter.pendingNoteID) { _, newID in
+                if let newID { handleDeepLink(newID) }
+            }
+    }
+
+    /// Resolves a widget deep link. On the iPad two-pane layout this opens the
+    /// note in the detail editor and clears the pending id. On iPhone and macOS
+    /// the matching `NoteRowView` opens its own edit sheet instead (it clears the
+    /// pending id itself), so we leave it untouched here.
+    private func handleDeepLink(_ id: UUID) {
+        #if os(iOS)
+        if hSizeClass == .regular {
+            var descriptor = FetchDescriptor<Note>(predicate: #Predicate { $0.id == id })
+            descriptor.fetchLimit = 1
+            if let note = try? modelContext.fetch(descriptor).first {
+                selectedNote = note
+            }
+            deepLinkRouter.pendingNoteID = nil
+        }
+        #endif
     }
 
     @ViewBuilder
