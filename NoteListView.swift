@@ -19,6 +19,7 @@ struct NoteListView: View {
     @AppStorage("noteTextSizeV2") private var textSizeRaw: Int = NoteTextSize.standard.rawValue
     @FocusState private var isInputFocused: Bool
     @ObservedObject private var deepLinkRouter = DeepLinkRouter.shared
+    @ObservedObject private var syncStatus = SyncStatus.shared
 
     #if os(iOS)
     @Environment(\.horizontalSizeClass) private var hSizeClass
@@ -66,6 +67,26 @@ struct NoteListView: View {
             .onChange(of: deepLinkRouter.pendingNoteID) { _, newID in
                 if let newID { handleDeepLink(newID) }
             }
+            // Warn when the store isn't syncing, so "local only" is never a silent surprise.
+            .safeAreaInset(edge: .top) { syncBanner }
+    }
+
+    @ViewBuilder
+    private var syncBanner: some View {
+        if syncStatus.needsAttention {
+            HStack(spacing: 7) {
+                Image(systemName: "exclamationmark.icloud")
+                Text(syncStatus.label)
+                    .fixedSize(horizontal: false, vertical: true)
+                Spacer(minLength: 0)
+            }
+            .font(.footnote.weight(.medium))
+            .foregroundStyle(Color(red: 0.72, green: 0.45, blue: 0.0))
+            .padding(.vertical, 8)
+            .padding(.horizontal, 14)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color.orange.opacity(0.16))
+        }
     }
 
     /// Resolves a widget deep link. On the iPad two-pane layout this opens the

@@ -25,6 +25,8 @@ struct QuickNoteApp: App {
                 HUDWindowController.shared.show()
             }
             Divider()
+            SyncStatusMenuItem()
+            Divider()
             Button("Quit QuickNote") {
                 NSApplication.shared.terminate(nil)
             }
@@ -38,14 +40,22 @@ struct QuickNoteApp: App {
 /// `Note` property has a default value (see `Note.swift`) and that there are no
 /// unique constraints — both hold here.
 enum AppModelContainer {
+    /// Whether the shared container was created with CloudKit enabled (vs. having
+    /// fallen back to a local-only store). Surfaced to the user via `SyncStatus`
+    /// so a non-syncing build announces itself instead of silently going local.
+    static private(set) var usesCloudKit = false
+
     static let shared: ModelContainer = {
         do {
             let configuration = ModelConfiguration(cloudKitDatabase: .automatic)
-            return try ModelContainer(for: Note.self, configurations: configuration)
+            let container = try ModelContainer(for: Note.self, configurations: configuration)
+            usesCloudKit = true
+            return container
         } catch {
             // Fall back to a local-only store so the app still launches when
             // CloudKit is unavailable (e.g. the user isn't signed into iCloud).
-            print("CloudKit container unavailable, falling back to local store: \(error)")
+            NSLog("QuickNote: CloudKit container unavailable, falling back to local store: \(error)")
+            usesCloudKit = false
             if let local = try? ModelContainer(for: Note.self) {
                 return local
             }
@@ -53,6 +63,17 @@ enum AppModelContainer {
         }
     }()
 }
+
+#if os(macOS)
+/// Live iCloud-sync status shown in the menu-bar menu. Renders as a
+/// (non-interactive) labelled row that updates as the account state changes.
+private struct SyncStatusMenuItem: View {
+    @ObservedObject private var status = SyncStatus.shared
+    var body: some View {
+        Label(status.label, systemImage: status.symbol)
+    }
+}
+#endif
 
 struct ContentView: View {
     var body: some View {
