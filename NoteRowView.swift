@@ -16,6 +16,7 @@ struct NoteRowView: View {
     @State private var noteDocument: NoteDocument?
     @State private var showingDeleteConfirmation = false
     @State private var saveErrorMessage: String?
+    @ObservedObject private var deepLinkRouter = DeepLinkRouter.shared
 
     private var isSelected: Bool { selection?.wrappedValue?.id == note.id }
 
@@ -37,6 +38,16 @@ struct NoteRowView: View {
             editedContent = note.content
             showingEditSheet = true
         }
+    }
+
+    /// Opens this row's edit sheet if a widget deep link targets this note.
+    /// Only the sheet-based layouts (iPhone/macOS, where `selection` is nil)
+    /// respond; the iPad detail pane handles deep links via `selection`.
+    private func openIfDeepLinked(_ id: UUID?) {
+        guard selection == nil, let id, id == note.id else { return }
+        editedContent = note.content
+        showingEditSheet = true
+        deepLinkRouter.pendingNoteID = nil
     }
 
     var body: some View {
@@ -176,6 +187,11 @@ struct NoteRowView: View {
         )
         .contentShape(Rectangle()) // Whole card (including padding) is tappable
         .onTapGesture(perform: beginEdit)
+        // Widget deep link: on iPhone/macOS (no detail pane) the row whose note
+        // was tapped opens its own edit sheet. iPad handles deep links via the
+        // detail selection instead, so we ignore them when `selection` is set.
+        .onAppear { openIfDeepLinked(deepLinkRouter.pendingNoteID) }
+        .onChange(of: deepLinkRouter.pendingNoteID) { _, id in openIfDeepLinked(id) }
         .contextMenu {
             Button(action: togglePin) {
                 Label(note.isPinned ? "Unpin" : "Pin to Top", systemImage: note.isPinned ? "pin.slash" : "pin")

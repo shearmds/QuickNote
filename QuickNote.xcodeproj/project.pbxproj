@@ -7,6 +7,9 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		06C6B9808B5CD5F470255C24 /* PinnedSnapshotSync.swift in Sources */ = {isa = PBXBuildFile; fileRef = B24E7B845DBCF372CF4DCF8D /* PinnedSnapshotSync.swift */; };
+		116E41BE9FCD6A983BC853ED /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = D10FD358C1048B68D928ED24 /* Foundation.framework */; };
+		64A0F6DB67BDA034D81B7807 /* PinnedNoteShared.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2B68FCEF059339D0A886087 /* PinnedNoteShared.swift */; };
 		79B573893002A8BC00A8BE6F /* Note.swift in Sources */ = {isa = PBXBuildFile; fileRef = 79B573863002A8BC00A8BE6F /* Note.swift */; };
 		79B5738A3002A8BC00A8BE6F /* HotkeyManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 79B573843002A8BC00A8BE6F /* HotkeyManager.swift */; };
 		79B5738B3002A8BC00A8BE6F /* HUDWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 79B573853002A8BC00A8BE6F /* HUDWindow.swift */; };
@@ -14,10 +17,40 @@
 		79B5738D3002A8BC00A8BE6F /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 79B573833002A8BC00A8BE6F /* ContentView.swift */; };
 		79B5738E3002A8BC00A8BE6F /* NoteRowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 79B573883002A8BC00A8BE6F /* NoteRowView.swift */; };
 		79B573903002B45600A8BE6F /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 79B5738F3002B45600A8BE6F /* Assets.xcassets */; };
+		9899072011F42922B220B6EF /* QuickNoteWidgetBundle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8E554A21381233A0098176D3 /* QuickNoteWidgetBundle.swift */; };
+		9A5A1DB179B15072CBC2E2E5 /* QuickNoteWidget.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 82F43A8D0A17BCEB38C24740 /* QuickNoteWidget.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		B7811734E8A147074FCC15BF /* PinnedNoteShared.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2B68FCEF059339D0A886087 /* PinnedNoteShared.swift */; };
+		CB26F6D80D2168724DAB9383 /* DeepLinkRouter.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE1E919D5C1D3A0A854E6CE1 /* DeepLinkRouter.swift */; };
+		DA433CF39F1D8A8420B0E0ED /* QuickNoteWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 293C685D56BA2463B02F60D6 /* QuickNoteWidget.swift */; };
 /* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		F94BE12D96D1D65FBBE2D01E /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 000000000000000000000000 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 35CBD0BEE3253D3DD3E39F76;
+			remoteInfo = QuickNoteWidget;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		C930B8A8835174694F923A6E /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				9A5A1DB179B15072CBC2E2E5 /* QuickNoteWidget.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		000000000000000000000120 /* QuickNote.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = QuickNote.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		293C685D56BA2463B02F60D6 /* QuickNoteWidget.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = QuickNoteWidget.swift; sourceTree = "<group>"; };
 		79B573833002A8BC00A8BE6F /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		79B573843002A8BC00A8BE6F /* HotkeyManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HotkeyManager.swift; sourceTree = "<group>"; };
 		79B573853002A8BC00A8BE6F /* HUDWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HUDWindow.swift; sourceTree = "<group>"; };
@@ -25,6 +58,14 @@
 		79B573873002A8BC00A8BE6F /* NoteListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoteListView.swift; sourceTree = "<group>"; };
 		79B573883002A8BC00A8BE6F /* NoteRowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoteRowView.swift; sourceTree = "<group>"; };
 		79B5738F3002B45600A8BE6F /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		82F43A8D0A17BCEB38C24740 /* QuickNoteWidget.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = QuickNoteWidget.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		8E554A21381233A0098176D3 /* QuickNoteWidgetBundle.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = QuickNoteWidgetBundle.swift; sourceTree = "<group>"; };
+		9FE242B6610AB9005F941CD6 /* Info.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		AE1E919D5C1D3A0A854E6CE1 /* DeepLinkRouter.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DeepLinkRouter.swift; sourceTree = "<group>"; };
+		AF0A54869E6EC6AAEBC9DB2F /* QuickNoteWidget.entitlements */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.entitlements; path = QuickNoteWidget.entitlements; sourceTree = "<group>"; };
+		B24E7B845DBCF372CF4DCF8D /* PinnedSnapshotSync.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PinnedSnapshotSync.swift; sourceTree = "<group>"; };
+		D10FD358C1048B68D928ED24 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS26.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
+		F2B68FCEF059339D0A886087 /* PinnedNoteShared.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PinnedNoteShared.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -32,6 +73,14 @@
 			isa = PBXFrameworksBuildPhase;
 			files = (
 			);
+		};
+		1757D41BDDD5464EC70403AC /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				116E41BE9FCD6A983BC853ED /* Foundation.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXFrameworksBuildPhase section */
 
@@ -47,6 +96,9 @@
 				79B573883002A8BC00A8BE6F /* NoteRowView.swift */,
 				79B5738F3002B45600A8BE6F /* Assets.xcassets */,
 				000000000000000000000020 /* Products */,
+				E3CCD9EC7B5C9B135E0B7E94 /* Shared */,
+				CC6C3A42ED087BDD7B1C44C3 /* QuickNoteWidget */,
+				7397E8D5D17C03763643F038 /* Frameworks */,
 			);
 			sourceTree = "<group>";
 		};
@@ -54,8 +106,48 @@
 			isa = PBXGroup;
 			children = (
 				000000000000000000000120 /* QuickNote.app */,
+				82F43A8D0A17BCEB38C24740 /* QuickNoteWidget.appex */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		7397E8D5D17C03763643F038 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				C96E547C79D2A3117A78876B /* iOS */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		C96E547C79D2A3117A78876B /* iOS */ = {
+			isa = PBXGroup;
+			children = (
+				D10FD358C1048B68D928ED24 /* Foundation.framework */,
+			);
+			name = iOS;
+			sourceTree = "<group>";
+		};
+		CC6C3A42ED087BDD7B1C44C3 /* QuickNoteWidget */ = {
+			isa = PBXGroup;
+			children = (
+				293C685D56BA2463B02F60D6 /* QuickNoteWidget.swift */,
+				8E554A21381233A0098176D3 /* QuickNoteWidgetBundle.swift */,
+				9FE242B6610AB9005F941CD6 /* Info.plist */,
+				AF0A54869E6EC6AAEBC9DB2F /* QuickNoteWidget.entitlements */,
+			);
+			name = QuickNoteWidget;
+			path = QuickNoteWidget;
+			sourceTree = "<group>";
+		};
+		E3CCD9EC7B5C9B135E0B7E94 /* Shared */ = {
+			isa = PBXGroup;
+			children = (
+				F2B68FCEF059339D0A886087 /* PinnedNoteShared.swift */,
+				B24E7B845DBCF372CF4DCF8D /* PinnedSnapshotSync.swift */,
+				AE1E919D5C1D3A0A854E6CE1 /* DeepLinkRouter.swift */,
+			);
+			name = Shared;
+			path = Shared;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -68,13 +160,34 @@
 				000000000000000120000000 /* Sources */,
 				000000000000000130000000 /* Frameworks */,
 				000000000000000140000000 /* Resources */,
+				C930B8A8835174694F923A6E /* Embed Foundation Extensions */,
 			);
 			buildRules = (
+			);
+			dependencies = (
+				FDB90D724CC9D771324B9098 /* PBXTargetDependency */,
 			);
 			name = QuickNote;
 			productName = MyApp;
 			productReference = 000000000000000000000120 /* QuickNote.app */;
 			productType = "com.apple.product-type.application";
+		};
+		35CBD0BEE3253D3DD3E39F76 /* QuickNoteWidget */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = D828EBBA333E4E4506F41CA7 /* Build configuration list for PBXNativeTarget "QuickNoteWidget" */;
+			buildPhases = (
+				6FC6D194379C847E1EFB6011 /* Sources */,
+				1757D41BDDD5464EC70403AC /* Frameworks */,
+				CAF7318C14DF695366FB2BDB /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = QuickNoteWidget;
+			productName = QuickNoteWidget;
+			productReference = 82F43A8D0A17BCEB38C24740 /* QuickNoteWidget.appex */;
+			productType = "com.apple.product-type.app-extension";
 		};
 /* End PBXNativeTarget section */
 
@@ -107,6 +220,7 @@
 			projectRoot = "";
 			targets = (
 				000000000000000100000000 /* QuickNote */,
+				35CBD0BEE3253D3DD3E39F76 /* QuickNoteWidget */,
 			);
 		};
 /* End PBXProject section */
@@ -117,6 +231,13 @@
 			files = (
 				79B573903002B45600A8BE6F /* Assets.xcassets in Resources */,
 			);
+		};
+		CAF7318C14DF695366FB2BDB /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
 
@@ -130,12 +251,34 @@
 				79B5738C3002A8BC00A8BE6F /* NoteListView.swift in Sources */,
 				79B5738D3002A8BC00A8BE6F /* ContentView.swift in Sources */,
 				79B5738E3002A8BC00A8BE6F /* NoteRowView.swift in Sources */,
+				B7811734E8A147074FCC15BF /* PinnedNoteShared.swift in Sources */,
+				06C6B9808B5CD5F470255C24 /* PinnedSnapshotSync.swift in Sources */,
+				CB26F6D80D2168724DAB9383 /* DeepLinkRouter.swift in Sources */,
 			);
+		};
+		6FC6D194379C847E1EFB6011 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				DA433CF39F1D8A8420B0E0ED /* QuickNoteWidget.swift in Sources */,
+				9899072011F42922B220B6EF /* QuickNoteWidgetBundle.swift in Sources */,
+				64A0F6DB67BDA034D81B7807 /* PinnedNoteShared.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
 
+/* Begin PBXTargetDependency section */
+		FDB90D724CC9D771324B9098 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			name = QuickNoteWidget;
+			target = 35CBD0BEE3253D3DD3E39F76 /* QuickNoteWidget */;
+			targetProxy = F94BE12D96D1D65FBBE2D01E /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
 /* Begin XCBuildConfiguration section */
-		000000000000000011000000 /* Debug configuration for PBXProject "QuickNote" */ = {
+		000000000000000011000000 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
@@ -205,7 +348,7 @@
 			};
 			name = Debug;
 		};
-		000000000000000012000000 /* Release configuration for PBXProject "QuickNote" */ = {
+		000000000000000012000000 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
@@ -267,7 +410,7 @@
 			};
 			name = Release;
 		};
-		000000000000000111000000 /* Debug configuration for PBXNativeTarget "QuickNote" */ = {
+		000000000000000111000000 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
@@ -312,7 +455,7 @@
 			};
 			name = Debug;
 		};
-		000000000000000112000000 /* Release configuration for PBXNativeTarget "QuickNote" */ = {
+		000000000000000112000000 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
@@ -356,23 +499,101 @@
 			};
 			name = Release;
 		};
+		23E5FDB5FC7545DFD1E3D1DA /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALLOW_TARGET_PLATFORM_SPECIALIZATION = YES;
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = NO;
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_ENTITLEMENTS = QuickNoteWidget/QuickNoteWidget.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 95E9CZ9HW6;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = QuickNoteWidget/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = QuickNote;
+				IPHONEOS_DEPLOYMENT_TARGET = 27.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 27.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.shearair.QuickNote.QuickNoteWidget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				SDKROOT = auto;
+				SKIP_INSTALL = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2,7";
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		4EF0B5F3D594B5C98CE8E485 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALLOW_TARGET_PLATFORM_SPECIALIZATION = YES;
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = NO;
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_ENTITLEMENTS = QuickNoteWidget/QuickNoteWidget.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 95E9CZ9HW6;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = QuickNoteWidget/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = QuickNote;
+				IPHONEOS_DEPLOYMENT_TARGET = 27.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 27.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.shearair.QuickNote.QuickNoteWidget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				SDKROOT = auto;
+				SKIP_INSTALL = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2,7";
+			};
+			name = Debug;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
 		000000000000000010000000 /* Build configuration list for PBXProject "QuickNote" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				000000000000000011000000 /* Debug configuration for PBXProject "QuickNote" */,
-				000000000000000012000000 /* Release configuration for PBXProject "QuickNote" */,
+				000000000000000011000000 /* Debug */,
+				000000000000000012000000 /* Release */,
 			);
 			defaultConfigurationName = Release;
 		};
 		000000000000000110000000 /* Build configuration list for PBXNativeTarget "QuickNote" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				000000000000000111000000 /* Debug configuration for PBXNativeTarget "QuickNote" */,
-				000000000000000112000000 /* Release configuration for PBXNativeTarget "QuickNote" */,
+				000000000000000111000000 /* Debug */,
+				000000000000000112000000 /* Release */,
 			);
+			defaultConfigurationName = Release;
+		};
+		D828EBBA333E4E4506F41CA7 /* Build configuration list for PBXNativeTarget "QuickNoteWidget" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				23E5FDB5FC7545DFD1E3D1DA /* Release */,
+				4EF0B5F3D594B5C98CE8E485 /* Debug */,
+			);
+			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
