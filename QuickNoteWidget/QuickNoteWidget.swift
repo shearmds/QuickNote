@@ -46,6 +46,9 @@ struct PinnedNotesWidget: Widget {
         .configurationDisplayName("Pinned Notes")
         .description("Your pinned QuickNotes, always a glance away.")
         .supportedFamilies([.systemSmall, .systemMedium, .systemLarge])
+        // Take over the insets ourselves — the default content margins left the
+        // "Pinned" header crowding the top edge on some devices.
+        .contentMarginsDisabled()
     }
 }
 
@@ -77,6 +80,10 @@ struct PinnedNotesWidgetView: View {
                 }
             }
         }
+        // Explicit insets now that default content margins are disabled, so the
+        // header always has breathing room from the widget's edges.
+        .padding(family == .systemSmall ? 14 : 16)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         // Small widgets can't host per-row links, so the whole tile opens the
         // top pinned note. Medium/large use per-row `Link`s instead.
         .modifier(SmallWidgetLink(url: family == .systemSmall ? topNoteURL : nil))
